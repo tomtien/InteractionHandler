@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { Collection, Routes } = require("discord.js");
+const { Collection, Routes, PermissionsBitField } = require("discord.js");
 const { REST } = require('@discordjs/rest');
 const { isAsyncFunction } = require("util/types");
 const chalk = require("chalk")
@@ -19,7 +19,6 @@ module.exports = class interactionHandler {
             this.options.log(msg);
         }
     }
-
     async putGuildCommands() {
         const clientId = this.client.user.id;
         const guilds = await this.client.guilds.fetch();
@@ -50,7 +49,8 @@ module.exports = class interactionHandler {
                 if (!isAsyncFunction(execute)) throw new Error(`Load function of ${commandName} command is not async`);
                 load(this.bot);
             }
-            this.commands.set(commandName, execute);
+            const permissions = commandSrc.permissions;
+            this.commands.set(commandName, { execute: execute, permissions: permissions | null });
             this.commandsJSON.push(command.toJSON());
             this.log(chalk.green(`Loaded command: ${commandName}`));
         }
@@ -62,18 +62,30 @@ module.exports = class interactionHandler {
             if (!eventId) throw new Error(`Event doesn't export a id`);
             const execute = event.execute;
             if (!execute) throw new Error(`Event: ${eventId} does not export an execute function`);
-            this.events.set(eventId, execute);
+            const load = eventSrc.load;
+            if (load) {
+                if (!isAsyncFunction(execute)) throw new Error(`Load function of ${commandName} command is not async`);
+                load(this.bot);
+            }
+            const permissions = eventSrc.permissions;
+            this.events.set(eventId, { execute: execute, permissions: permissions | null });
             this.log(chalk.green(`Loaded event: ${eventId}`));
         }
     }
 
     async handleInteraction(interaction) {
         if (interaction.isCommand()) {
-            const execute = this.commands.get(interaction.commandName);
+            const { execute, permissions } = this.commands.get(interaction.commandName);
+            if (permissions) {
+                if (!interaction.member.permissions.has(permissions)) return;
+            }
             if (!execute) return;
             await execute(this.client, interaction);
         } else {
-            const execute = this.events.get(interaction.customId);
+            const { execute, permissions } = this.events.get(interaction.customId);
+            if (permissions) {
+                if (!interaction.member.permissions.has(permissions)) return;
+            }
             if (!execute) return;
             await execute(this.client, interaction);
         }
