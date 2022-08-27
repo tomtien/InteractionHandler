@@ -22,15 +22,53 @@ module.exports = class interactionHandler {
     async putGuildCommands() {
         const clientId = this.client.user.id;
         const guilds = await this.client.guilds.fetch();
-        const rest = new REST({ version: "9" }).setToken(this.token);
+        const rest = new REST({ version: "10" }).setToken(this.token);
         guilds.forEach(async guild => {
-            await rest.put(
+            rest.put(
                 Routes.applicationGuildCommands(clientId, guild.id),
                 { body: this.commandsJSON },
-            )
-            this.log(chalk.blueBright(`Refreshed (/) commands for "${guild.name}"`))
+            ).then(() => {
+                this.log(chalk.blueBright(`Refreshed (/) commands for "${guild.name}"`));
+            })
         })
     }
+    async putGlobalCommands() {
+        const clientId = this.client.user.id;
+        const rest = new REST({ version: "10" }).setToken(this.token);
+
+        await rest.put(
+            Routes.applicationCommands(clientId),
+            { body: this.commandsJSON },
+        )
+        this.log(chalk.blueBright(`Refreshed (/) commands globally`));
+    }
+    async removeGuildCommands() {
+        const clientId = this.client.user.id;
+        const guilds = await this.client.guilds.fetch();
+        const rest = new REST({ version: "10" }).setToken(this.token);
+        guilds.forEach(async guild => {
+            rest.put(
+                Routes.applicationGuildCommands(clientId, guild.id),
+                { body: {} },
+            ).then(() => {
+                this.log(chalk.blueBright(`Removed all (/) commands for "${guild.name}"`));
+            })
+        })
+    }
+    // for guild-based commands
+    async removeGlobalCommands(commandId) {
+        const clientId = this.client.user.id;
+        const rest = new REST({ version: "10" }).setToken(this.token);
+
+        await rest.put(
+            Routes.applicationCommands(clientId),
+            { body: {} },
+        )
+        this.log(chalk.blueBright(`Removed all (/) commands globally`));
+    }
+
+    // for global commands
+
 
     async loadCommands(commandDir, eventDir) {
         const commandFiles = this.readAllFiles(commandDir).filter(file => file.endsWith(".js"));
@@ -77,14 +115,14 @@ module.exports = class interactionHandler {
         if (interaction.isCommand()) {
             const { execute, permissions } = this.commands.get(interaction.commandName);
             if (permissions) {
-                if (!interaction.member.permissions.has(permissions)) return;
+                if (!interaction.memberPermissions.has(permissions)) return;
             }
             if (!execute) return;
             await execute(this.client, interaction);
         } else {
             const { execute, permissions } = this.events.get(interaction.customId);
             if (permissions) {
-                if (!interaction.member.permissions.has(permissions)) return;
+                if (!interaction.memberPermissions.has(permissions)) return;
             }
             if (!execute) return;
             await execute(this.client, interaction);
