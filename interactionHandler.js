@@ -3,7 +3,7 @@ const path = require("path");
 const { Collection, Routes, PermissionsBitField } = require("discord.js");
 const { REST } = require('@discordjs/rest');
 const { isAsyncFunction } = require("util/types");
-const chalk = require("chalk")
+
 
 module.exports = class interactionHandler {
     constructor(client, token, options = {}) {
@@ -28,7 +28,7 @@ module.exports = class interactionHandler {
                 Routes.applicationGuildCommands(clientId, guild.id),
                 { body: this.commandsJSON },
             ).then(() => {
-                this.log(chalk.blueBright(`Refreshed (/) commands for "${guild.name}"`));
+                this.log(`Refreshed (/) commands for "${guild.name}"`);
             })
         })
     }
@@ -40,7 +40,7 @@ module.exports = class interactionHandler {
             Routes.applicationCommands(clientId),
             { body: this.commandsJSON },
         )
-        this.log(chalk.blueBright(`Refreshed (/) commands globally`));
+        this.log(`Refreshed (/) commands globally`);
     }
     async removeGuildCommands() {
         const clientId = this.client.user.id;
@@ -51,7 +51,7 @@ module.exports = class interactionHandler {
                 Routes.applicationGuildCommands(clientId, guild.id),
                 { body: {} },
             ).then(() => {
-                this.log(chalk.blueBright(`Removed all (/) commands for "${guild.name}"`));
+                this.log(`Removed all (/) commands for "${guild.name}"`);
             })
         })
     }
@@ -64,7 +64,7 @@ module.exports = class interactionHandler {
             Routes.applicationCommands(clientId),
             { body: {} },
         )
-        this.log(chalk.blueBright(`Removed all (/) commands globally`));
+        this.log(`Removed all (/) commands globally`);
     }
 
     // for global commands
@@ -90,7 +90,7 @@ module.exports = class interactionHandler {
             const permissions = commandSrc.permissions;
             this.commands.set(commandName, { execute: execute, permissions: permissions | null });
             this.commandsJSON.push(command.toJSON());
-            this.log(chalk.green(`Loaded command: ${commandName}`));
+            this.log(`Loaded command: ${commandName}`);
         }
         for (const eventFile of eventFiles) {
             const eventSrc = require(eventFile);
@@ -107,20 +107,24 @@ module.exports = class interactionHandler {
             }
             const permissions = eventSrc.permissions;
             this.events.set(eventId, { execute: execute, permissions: permissions | null });
-            this.log(chalk.green(`Loaded event: ${eventId}`));
+            this.log(`Loaded event: ${eventId}`);
         }
     }
 
     async handleInteraction(interaction) {
         if (interaction.isCommand()) {
-            const { execute, permissions } = this.commands.get(interaction.commandName);
+            const cmd = this.commands.get(interaction.commandName);
+            if (!cmd) return;
+            const { execute, permissions } = cmd
             if (permissions) {
                 if (!interaction.memberPermissions.has(permissions)) return;
             }
             if (!execute) return;
             await execute(this.client, interaction);
         } else {
-            const { execute, permissions } = this.events.get(interaction.customId);
+            const event = this.events.get(interaction.customId);
+            if (!event) return;
+            const { execute, permissions } = event;
             if (permissions) {
                 if (!interaction.memberPermissions.has(permissions)) return;
             }
